@@ -3,10 +3,92 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import mysql.connector
+import sqlite3
 import numpy as np
 from datetime import datetime
 import plotly.express as px
 import plotly.graph_objects as go
+import os
+
+def create_sample_database():
+    """Create a sample SQLite database for cloud deployment"""
+    if os.path.exists("ecom.db"):
+        return  # Database already exists
+    
+    st.info("🏗️ Creating sample database for demonstration...")
+    
+    # Create SQLite connection
+    conn = sqlite3.connect("ecom.db")
+    
+    # Create sample data (much smaller than full dataset)
+    
+    # Sample customers data
+    customers_data = {
+        'customer_id': [f'customer_{i}' for i in range(1, 1001)],
+        'customer_city': ['Sao Paulo', 'Rio de Janeiro', 'Belo Horizonte', 'Brasilia', 'Curitiba'] * 200,
+        'customer_state': ['SP', 'RJ', 'MG', 'DF', 'PR'] * 200
+    }
+    customers_df = pd.DataFrame(customers_data)
+    customers_df.to_sql('customers', conn, if_exists='replace', index=False)
+    
+    # Sample orders data
+    orders_data = {
+        'order_id': [f'order_{i}' for i in range(1, 1001)],
+        'customer_id': [f'customer_{i}' for i in range(1, 1001)],
+        'order_purchase_timestamp': pd.date_range('2017-01-01', periods=1000, freq='D')
+    }
+    orders_df = pd.DataFrame(orders_data)
+    orders_df.to_sql('orders', conn, if_exists='replace', index=False)
+    
+    # Sample products data
+    products_data = {
+        'product_id': [f'product_{i}' for i in range(1, 501)],
+        'product_category': ['electronics', 'clothing', 'books', 'home', 'sports'] * 100
+    }
+    products_df = pd.DataFrame(products_data)
+    products_df.to_sql('products', conn, if_exists='replace', index=False)
+    
+    # Sample payments data
+    payments_data = {
+        'order_id': [f'order_{i}' for i in range(1, 1001)],
+        'payment_value': [round(50 + (i % 200), 2) for i in range(1000)],
+        'payment_installments': [1, 2, 3, 4, 5] * 200
+    }
+    payments_df = pd.DataFrame(payments_data)
+    payments_df.to_sql('payments', conn, if_exists='replace', index=False)
+    
+    # Sample order_items data
+    order_items_data = {
+        'order_id': [f'order_{i}' for i in range(1, 1001)],
+        'product_id': [f'product_{(i % 500) + 1}' for i in range(1000)],
+        'seller_id': [f'seller_{(i % 100) + 1}' for i in range(1000)],
+        'price': [round(30 + (i % 150), 2) for i in range(1000)]
+    }
+    order_items_df = pd.DataFrame(order_items_data)
+    order_items_df.to_sql('order_items', conn, if_exists='replace', index=False)
+    
+    # Sample sellers data
+    sellers_data = {
+        'seller_id': [f'seller_{i}' for i in range(1, 101)],
+        'seller_city': ['Sao Paulo', 'Rio de Janeiro', 'Belo Horizonte'] * 34,
+        'seller_state': ['SP', 'RJ', 'MG'] * 34
+    }
+    sellers_df = pd.DataFrame(sellers_data[:100])  # Take only first 100
+    sellers_df.to_sql('sellers', conn, if_exists='replace', index=False)
+    
+    # Sample geolocation data
+    geolocation_data = {
+        'geolocation_zip_code_prefix': [f'0{i:04d}' for i in range(1000)],
+        'geolocation_lat': [-23.5 + (i * 0.01) for i in range(1000)],
+        'geolocation_lng': [-46.6 + (i * 0.01) for i in range(1000)],
+        'geolocation_city': ['Sao Paulo'] * 1000,
+        'geolocation_state': ['SP'] * 1000
+    }
+    geolocation_df = pd.DataFrame(geolocation_data)
+    geolocation_df.to_sql('geolocation', conn, if_exists='replace', index=False)
+    
+    conn.close()
+    st.success("✅ Sample database created successfully!")
 
 # Set page config
 st.set_page_config(
@@ -36,41 +118,97 @@ st.markdown("""
 def get_database_connection():
     """Establish database connection with caching"""
     try:
-        # Try to use Streamlit secrets first (for cloud deployment)
-        if hasattr(st, 'secrets') and 'mysql' in st.secrets:
+        # Check if we're running in Streamlit Cloud (no local MySQL)
+        # or if SQLite file exists, use SQLite for deployment
+        if not os.path.exists("C:\\"):  # Not Windows (likely cloud environment)
+            # Create sample database if it doesn't exist
+            if not os.path.exists("ecom.db"):
+                create_sample_database()
+            
+            # Running in cloud environment, use SQLite
+            conn = sqlite3.connect("ecom.db")
+            st.info("📊 Using SQLite database for cloud deployment")
+            return conn, "sqlite"
+        
+        # Try to use Streamlit secrets first (for cloud MySQL deployment)
+        elif hasattr(st, 'secrets') and 'mysql' in st.secrets:
             conn = mysql.connector.connect(
                 host=st.secrets.mysql.host,
                 user=st.secrets.mysql.user,
                 password=st.secrets.mysql.password,
-                database=st.secrets.mysql.database
+                database=st.secrets.mysql.database,
+                autocommit=True,
+                connection_timeout=60
             )
+            return conn, "mysql"
         else:
-            # Fallback to hardcoded values (for local development)
+            # Fallback to local MySQL (for local development)
             conn = mysql.connector.connect(
                 host='localhost',
                 user='root',
                 password='Punarbasu_03',  # Note: In production, use environment variables
-                database='ECOM'
+                database='ECOM',
+                autocommit=True,
+                connection_timeout=60
             )
-        return conn
+            return conn, "mysql"
     except mysql.connector.Error as err:
+        # If MySQL fails, try SQLite as fallback
+        if os.path.exists("ecom.db"):
+            st.warning("⚠️ MySQL connection failed, using SQLite fallback")
+            conn = sqlite3.connect("ecom.db")
+            return conn, "sqlite"
+        elif not os.path.exists("C:\\"):  # Cloud environment
+            create_sample_database()
+            conn = sqlite3.connect("ecom.db")
+            st.warning("⚠️ MySQL not available, created sample SQLite database")
+            return conn, "sqlite"
         st.error(f"Database connection failed: {err}")
         st.info("💡 **Tip**: Make sure your MySQL server is running and credentials are correct.")
-        return None
+        return None, None
     except Exception as e:
+        # If MySQL fails, try SQLite as fallback
+        if os.path.exists("ecom.db"):
+            st.warning("⚠️ MySQL connection failed, using SQLite fallback")
+            conn = sqlite3.connect("ecom.db")
+            return conn, "sqlite"
+        elif not os.path.exists("C:\\"):  # Cloud environment
+            create_sample_database()
+            conn = sqlite3.connect("ecom.db")
+            st.warning("⚠️ MySQL not available, created sample SQLite database")
+            return conn, "sqlite"
         st.error(f"Unexpected error: {e}")
-        return None
+        return None, None
 
-# Function to execute queries with error handling
-def execute_query(query, connection):
-    """Execute SQL query and return results"""
+# Function to execute queries with error handling and reconnection
+def execute_query(query, connection, db_type):
+    """Execute SQL query and return results with automatic reconnection"""
     try:
+        # Check if connection is still alive
+        if connection is None:
+            st.error("No database connection available")
+            return None
+        
+        if db_type == "mysql":
+            # Try to ping the connection to see if it's still alive
+            try:
+                connection.ping(reconnect=True, attempts=3, delay=1)
+            except:
+                # If ping fails, clear cache and get new connection
+                st.cache_resource.clear()
+                connection, db_type = get_database_connection()
+                if connection is None:
+                    return None
+        
         cursor = connection.cursor()
         cursor.execute(query)
         data = cursor.fetchall()
+        cursor.close()
         return data
-    except mysql.connector.Error as err:
+    except Exception as err:
         st.error(f"Query execution failed: {err}")
+        # Clear cache and try to reconnect
+        st.cache_resource.clear()
         return None
 
 # Main app
@@ -78,12 +216,31 @@ def main():
     st.title("🛒 E-Commerce Data Analysis Dashboard")
     st.markdown("---")
     
+    # Add refresh connection button in sidebar
+    with st.sidebar:
+        if st.button("🔄 Refresh Connection"):
+            st.cache_resource.clear()
+            st.experimental_rerun()
+    
     # Get database connection
-    db_connection = get_database_connection()
+    db_connection, db_type = get_database_connection()
     
     if db_connection is None:
         st.error("❌ Unable to connect to database. Please check your connection settings.")
-        st.info("📝 **Note**: This app requires a MySQL database connection. Make sure your database is running.")
+        st.info("📝 **Note**: This app requires a database connection. Make sure your database is accessible.")
+        if st.button("🔄 Try Reconnecting"):
+            st.cache_resource.clear()
+            st.experimental_rerun()
+        return
+    
+    # Show connection type
+    if db_type == "sqlite":
+        st.success("✅ Connected to SQLite database successfully!")
+    else:
+        st.success("✅ Connected to MySQL database successfully!")
+        if st.button("🔄 Try Reconnecting"):
+            st.cache_resource.clear()
+            st.experimental_rerun()
         return
     
     st.success("✅ Connected to database successfully!")
@@ -112,21 +269,21 @@ def main():
         with col1:
             # Total customers
             query = "SELECT COUNT(DISTINCT customer_id) FROM customers"
-            result = execute_query(query, db_connection)
+            result = execute_query(query, db_connection, db_type)
             if result:
                 st.metric("Total Customers", f"{result[0][0]:,}")
         
         with col2:
             # Total orders
             query = "SELECT COUNT(order_id) FROM orders"
-            result = execute_query(query, db_connection)
+            result = execute_query(query, db_connection, db_type)
             if result:
                 st.metric("Total Orders", f"{result[0][0]:,}")
         
         with col3:
             # Total revenue
             query = "SELECT ROUND(SUM(payment_value), 2) FROM payments"
-            result = execute_query(query, db_connection)
+            result = execute_query(query, db_connection, db_type)
             if result:
                 st.metric("Total Revenue", f"${result[0][0]:,.2f}")
         
@@ -152,7 +309,7 @@ def main():
         with tab1:
             st.subheader("Unique Customer Cities")
             query = "SELECT DISTINCT customer_city FROM customers ORDER BY customer_city"
-            result = execute_query(query, db_connection)
+            result = execute_query(query, db_connection, db_type)
             
             if result:
                 df = pd.DataFrame(result, columns=["City"])
@@ -163,7 +320,7 @@ def main():
             st.subheader("Customer Distribution by State")
             query = """SELECT customer_state, COUNT(customer_id) as customer_count 
                       FROM customers GROUP BY customer_state ORDER BY customer_count DESC"""
-            result = execute_query(query, db_connection)
+            result = execute_query(query, db_connection, db_type)
             
             if result:
                 df = pd.DataFrame(result, columns=["State", "Customer Count"])
@@ -190,7 +347,7 @@ def main():
             year = st.selectbox("Select Year:", [2016, 2017, 2018])
             
             query = f"SELECT COUNT(order_id) FROM orders WHERE YEAR(order_purchase_timestamp) = {year}"
-            result = execute_query(query, db_connection)
+            result = execute_query(query, db_connection, db_type)
             
             if result:
                 st.metric(f"Orders in {year}", f"{result[0][0]:,}")
@@ -204,7 +361,7 @@ def main():
                       GROUP BY MONTH(order_purchase_timestamp), MONTHNAME(order_purchase_timestamp)
                       ORDER BY MONTH(order_purchase_timestamp)"""
             
-            result = execute_query(query, db_connection)
+            result = execute_query(query, db_connection, db_type)
             
             if result:
                 df = pd.DataFrame(result, columns=["Month", "Orders"])
@@ -231,7 +388,7 @@ def main():
                       ORDER BY avg_products DESC
                       LIMIT 20"""
             
-            result = execute_query(query, db_connection)
+            result = execute_query(query, db_connection, db_type)
             
             if result:
                 df = pd.DataFrame(result, columns=["City", "Average Products per Order"])
@@ -258,7 +415,7 @@ def main():
                       GROUP BY category
                       ORDER BY sales DESC"""
             
-            result = execute_query(query, db_connection)
+            result = execute_query(query, db_connection, db_type)
             
             if result:
                 df = pd.DataFrame(result, columns=["Category", "Sales"])
@@ -283,7 +440,7 @@ def main():
                       GROUP BY category 
                       ORDER BY sales_percentage DESC"""
             
-            result = execute_query(query, db_connection)
+            result = execute_query(query, db_connection, db_type)
             
             if result:
                 df = pd.DataFrame(result, columns=["Category", "Percentage"])
@@ -304,7 +461,7 @@ def main():
                       HAVING purchase_count > 100
                       ORDER BY purchase_count DESC"""
             
-            result = execute_query(query, db_connection)
+            result = execute_query(query, db_connection, db_type)
             
             if result:
                 df = pd.DataFrame(result, columns=["Category", "Purchase Count", "Average Price"])
@@ -337,7 +494,7 @@ def main():
                        GROUP BY years, months 
                        ORDER BY years, months) as a"""
             
-            result = execute_query(query, db_connection)
+            result = execute_query(query, db_connection, db_type)
             
             if result:
                 df = pd.DataFrame(result, columns=["Year", "Month", "Monthly Sales", "Cumulative Sales"])
@@ -363,7 +520,7 @@ def main():
                                    LAG(payment, 1) OVER(ORDER BY years)) * 100, 2) as yoy_growth
                       FROM yearly_sales"""
             
-            result = execute_query(query, db_connection)
+            result = execute_query(query, db_connection, db_type)
             
             if result:
                 df = pd.DataFrame(result, columns=["Year", "Sales", "YoY Growth %"])
@@ -387,7 +544,7 @@ def main():
                       ORDER BY customer_id, order_purchase_timestamp
                       LIMIT 1000"""
             
-            result = execute_query(query, db_connection)
+            result = execute_query(query, db_connection, db_type)
             
             if result:
                 df = pd.DataFrame(result, columns=["Customer ID", "Date", "Payment", "Moving Average"])
@@ -430,7 +587,7 @@ def main():
                   FROM first_orders 
                   LEFT JOIN repeat_customers ON first_orders.customer_id = repeat_customers.customer_id"""
         
-        result = execute_query(query, db_connection)
+        result = execute_query(query, db_connection, db_type)
         
         if result:
             total_customers, retained_customers, retention_rate = result[0]
@@ -473,7 +630,7 @@ def main():
                       ORDER BY revenue DESC
                       LIMIT 15"""
             
-            result = execute_query(query, db_connection)
+            result = execute_query(query, db_connection, db_type)
             
             if result:
                 df = pd.DataFrame(result, columns=["Seller ID", "Revenue", "Rank"])
@@ -499,7 +656,7 @@ def main():
                       WHERE ranking <= 3
                       ORDER BY years, ranking"""
             
-            result = execute_query(query, db_connection)
+            result = execute_query(query, db_connection, db_type)
             
             if result:
                 df = pd.DataFrame(result, columns=["Year", "Customer ID", "Payment", "Rank"])
@@ -514,7 +671,7 @@ def main():
     # Footer
     st.markdown("---")
     st.markdown("### 📊 Dashboard created using Streamlit")
-    st.markdown("*Data source: E-commerce MySQL Database*")
+    st.markdown("*Data source: E-commerce SQLite Database*")
     
     # Professional Links Section
     st.markdown("---")
