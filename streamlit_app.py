@@ -515,6 +515,27 @@ def main():
     st.markdown("---")
     st.markdown("### 📊 Dashboard created using Streamlit")
     st.markdown("*Data source: E-commerce MySQL Database*")
+    
+    # Professional Links Section
+    st.markdown("---")
+    st.markdown("### 👨‍💻 Created by Punarbasu Chakraborty")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("🔗 **LinkedIn**")
+        st.markdown("[Connect with me](https://www.linkedin.com/in/punarbasu-chakraborty-628566252/")
+    
+    with col2:
+        st.markdown("🐙 **GitHub**")
+        st.markdown("[View my projects](https://github.com/punarchakra02)")
+    
+    with col3:
+        st.markdown("📧 **Email**")
+        st.markdown("[Contact me](mailto:punarbasu02chakra@gmail.com)")
+    
+    st.markdown("---")
+    st.markdown("*Built with ❤️ using Python, SQL & Streamlit*")
 
 if __name__ == "__main__":
     main()
