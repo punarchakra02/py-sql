@@ -524,7 +524,7 @@ def main():
     
     with col1:
         st.markdown("🔗 **LinkedIn**")
-        st.markdown("[Connect with me](https://www.linkedin.com/in/punarbasu-chakraborty-628566252/")
+        st.markdown("[Connect with me](https://linkedin.com/in/punarbasu-chakraborty-628566252/)")
     
     with col2:
         st.markdown("🐙 **GitHub**")
