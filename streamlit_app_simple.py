@@ -118,7 +118,7 @@ def main():
         st.header("Dashboard Overview")
         
         # Key Metrics
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3 = st.columns(3)
         
         with col1:
             # Total customers
@@ -128,20 +128,13 @@ def main():
                 st.metric("Total Customers", f"{result[0][0]:,}")
         
         with col2:
-            # Total unique orders
+            # Total orders
             query = "SELECT COUNT(DISTINCT order_id) as total_orders FROM orders"
             result = execute_query(query, db_connection)
             if result:
-                st.metric("Unique Orders", f"{result[0][0]:,}")
+                st.metric("Total Orders", f"{result[0][0]:,}")
         
         with col3:
-            # Total order records (including duplicates)
-            query = "SELECT COUNT(*) as total_records FROM orders"
-            result = execute_query(query, db_connection)
-            if result:
-                st.metric("Order Records", f"{result[0][0]:,}")
-        
-        with col4:
             # Total revenue
             query = "SELECT ROUND(SUM(payment_value), 2) as total_revenue FROM payments"
             result = execute_query(query, db_connection)
@@ -149,27 +142,6 @@ def main():
                 st.metric("Total Revenue", f"${result[0][0]:,.2f}")
         
         st.markdown("---")
-        
-        # Add data explanation
-        st.info("📊 **Data Note**: 'Unique Orders' shows distinct business transactions, while 'Order Records' shows total database rows (including duplicates).")
-        
-        # Additional insights
-        col_a, col_b = st.columns(2)
-        
-        with col_a:
-            # Customers with orders
-            query = "SELECT COUNT(DISTINCT customer_id) FROM orders"
-            result = execute_query(query, db_connection)
-            if result:
-                st.metric("Active Customers", f"{result[0][0]:,}")
-        
-        with col_b:
-            # Average order value
-            query = "SELECT ROUND(AVG(payment_value), 2) FROM payments"
-            result = execute_query(query, db_connection)
-            if result:
-                st.metric("Avg Order Value", f"${result[0][0]:,.2f}")
-        
         st.markdown("### 📋 About This Dashboard")
         st.markdown("This dashboard analyzes e-commerce data including:")
         st.markdown("• **Customer Demographics**: Cities, states, and customer distribution")
@@ -203,81 +175,11 @@ def main():
     elif analysis_type == "📦 Order Analysis":
         st.header("Order Analysis")
         
-        # Order statistics
-        st.subheader("Order Statistics")
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            # Unique orders
-            query = "SELECT COUNT(DISTINCT order_id) as total_orders FROM orders"
-            result = execute_query(query, db_connection)
-            if result:
-                st.metric("Unique Orders", f"{result[0][0]:,}")
-        
-        with col2:
-            # Orders per customer
-            query = """
-            SELECT ROUND(COUNT(DISTINCT order_id) * 1.0 / COUNT(DISTINCT customer_id), 2)
-            FROM orders
-            """
-            result = execute_query(query, db_connection)
-            if result:
-                st.metric("Orders per Customer", f"{result[0][0]:.2f}")
-        
-        with col3:
-            # Average order value
-            query = "SELECT ROUND(AVG(payment_value), 2) FROM payments"
-            result = execute_query(query, db_connection)
-            if result:
-                st.metric("Avg Order Value", f"${result[0][0]:,.2f}")
-        
-        with col4:
-            # Total products
-            query = "SELECT COUNT(DISTINCT product_id) FROM products"
-            result = execute_query(query, db_connection)
-            if result:
-                st.metric("Total Products", f"{result[0][0]:,}")
-        
-        # Data quality metrics
-        st.subheader("📊 Data Quality")
-        col_a, col_b = st.columns(2)
-        
-        with col_a:
-            # Total order records
-            query = "SELECT COUNT(*) FROM orders"
-            result = execute_query(query, db_connection)
-            if result:
-                st.metric("Order Records", f"{result[0][0]:,}")
-        
-        with col_b:
-            # Duplicate factor
-            query = """
-            SELECT ROUND(COUNT(*) * 1.0 / COUNT(DISTINCT order_id), 1) as dup_factor 
-            FROM orders
-            """
-            result = execute_query(query, db_connection)
-            if result:
-                st.metric("Duplicate Factor", f"{result[0][0]}x")
-        
-        st.info("💡 **Note**: Each order appears multiple times in the database. This could be due to order updates, multiple items, or data import issues.")
-        
-        # Orders by status
-        st.subheader("📈 Orders by Status")
-        query = "SELECT order_status, COUNT(DISTINCT order_id) as count FROM orders GROUP BY order_status ORDER BY count DESC"
-        result = execute_query(query, db_connection)
-        if result:
-            df = pd.DataFrame(result, columns=['Status', 'Count'])
-            fig = px.bar(df, x='Status', y='Count', title="Unique Orders by Status")
-            fig.update_xaxes(tickangle=45)
-            st.plotly_chart(fig, use_container_width=True)
-        
-        # Orders by month (using distinct orders to avoid duplicates)
-        st.subheader("📅 Orders Over Time")
+        # Orders by month
         query = """
         SELECT 
             DATE_FORMAT(order_purchase_timestamp, '%Y-%m') as month,
-            COUNT(DISTINCT order_id) as order_count
+            COUNT(*) as order_count
         FROM orders
         GROUP BY DATE_FORMAT(order_purchase_timestamp, '%Y-%m')
         ORDER BY month
@@ -288,8 +190,10 @@ def main():
             df = pd.DataFrame(result, columns=['Month', 'Order Count'])
             
             fig = px.line(df, x='Month', y='Order Count', 
-                         title="Unique Orders Over Time")
+                         title="Orders Over Time")
             st.plotly_chart(fig, use_container_width=True)
+            
+            st.dataframe(df)
     
     elif analysis_type == "💰 Sales & Revenue":
         st.header("Sales & Revenue Analysis")
@@ -313,7 +217,7 @@ def main():
             
             fig = px.bar(df, x='Category', y='Revenue',
                         title="Revenue by Product Category")
-            fig.update_xaxes(tickangle=45)
+            fig.update_xaxis(tickangle=45)
             st.plotly_chart(fig, use_container_width=True)
             
             st.dataframe(df)
@@ -321,13 +225,12 @@ def main():
     elif analysis_type == "📈 Time Series Analysis":
         st.header("Time Series Analysis")
         
-        # Monthly revenue trend (using distinct orders)
+        # Monthly revenue trend
         query = """
         SELECT 
             DATE_FORMAT(o.order_purchase_timestamp, '%Y-%m') as month,
-            ROUND(SUM(p.payment_value), 2) as monthly_revenue,
-            COUNT(DISTINCT o.order_id) as order_count
-        FROM (SELECT DISTINCT order_id, order_purchase_timestamp FROM orders) o
+            ROUND(SUM(p.payment_value), 2) as monthly_revenue
+        FROM orders o
         JOIN payments p ON o.order_id = p.order_id
         GROUP BY DATE_FORMAT(o.order_purchase_timestamp, '%Y-%m')
         ORDER BY month
@@ -335,19 +238,11 @@ def main():
         result = execute_query(query, db_connection)
         
         if result:
-            df = pd.DataFrame(result, columns=['Month', 'Revenue', 'Order Count'])
+            df = pd.DataFrame(result, columns=['Month', 'Revenue'])
             
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                fig1 = px.line(df, x='Month', y='Revenue',
-                             title="Monthly Revenue Trend")
-                st.plotly_chart(fig1, use_container_width=True)
-            
-            with col2:
-                fig2 = px.line(df, x='Month', y='Order Count',
-                             title="Monthly Order Count")
-                st.plotly_chart(fig2, use_container_width=True)
+            fig = px.line(df, x='Month', y='Revenue',
+                         title="Monthly Revenue Trend")
+            st.plotly_chart(fig, use_container_width=True)
             
             st.dataframe(df)
     
@@ -358,13 +253,13 @@ def main():
     
     # Professional Links Section
     st.markdown("---")
-    st.markdown("### 👨‍💻 Created by Punar Chakra")
+    st.markdown("### 👨‍💻 Created by Punarbasu Chakraborty")
     
     col1, col2, col3 = st.columns(3)
     
     with col1:
         st.markdown("🔗 **LinkedIn**")
-        st.markdown("[Connect with me](https://linkedin.com/in/your-linkedin-profile)")
+        st.markdown("[Connect with me](https://linkedin.com/in/punarbasu-chakraborty-628566252)")
     
     with col2:
         st.markdown("🐙 **GitHub**")
@@ -372,7 +267,7 @@ def main():
     
     with col3:
         st.markdown("📧 **Email**")
-        st.markdown("[Contact me](mailto:your.email@example.com)")
+        st.markdown("[Contact me](mailto:punarbasu02chakra@gmail.com)")
     
     st.markdown("---")
     st.markdown("*Built with ❤️ using Python, SQL & Streamlit*")

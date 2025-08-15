@@ -5,7 +5,7 @@
 DATABASE_CONFIG = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'YOUR_PASSWORD_HERE',  # Update this
+    'password': 'Punarbasu_03',  # Update this
     'database': 'ECOM'
 }
 
