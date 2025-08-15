@@ -1,6 +1,1 @@
-streamlit
-pandas
-plotly
-mysql-connector-python
-numpy
-seaborn
+streamlit==1.28.1

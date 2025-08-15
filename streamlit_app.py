@@ -399,13 +399,13 @@ def main():
     
     # Professional Links Section
     st.markdown("---")
-    st.markdown("### 👨‍💻 Created by Punar Chakra")
+    st.markdown("### 👨‍💻 Created by Punarbasu Chakraborty")
     
     col1, col2, col3 = st.columns(3)
     
     with col1:
         st.markdown("🔗 **LinkedIn**")
-        st.markdown("[Connect with me](https://linkedin.com/in/your-linkedin-profile)")
+        st.markdown("[Connect with me](https://linkedin.com/in/punarbasu-chakraborty-628566252/)")
     
     with col2:
         st.markdown("🐙 **GitHub**")
