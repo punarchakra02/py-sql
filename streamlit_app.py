@@ -7,6 +7,7 @@ import numpy as np
 from datetime import datetime
 import plotly.express as px
 import plotly.graph_objects as go
+import os
 
 # Set page config
 st.set_page_config(
@@ -36,8 +37,46 @@ st.markdown("""
 def get_database_connection():
     """Establish database connection with caching"""
     try:
-        # Try to use Streamlit secrets first (for cloud deployment)
-        if hasattr(st, 'secrets') and 'mysql' in st.secrets:
+        # Check for Railway environment variables first
+        if 'DATABASE_URL' in os.environ:
+            # Parse Railway DATABASE_URL (format: mysql://user:password@host:port/database)
+            database_url = os.environ['DATABASE_URL']
+            # Extract components from URL
+            import re
+            pattern = r'mysql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)'
+            match = re.match(pattern, database_url)
+            if match:
+                user, password, host, port, database = match.groups()
+                conn = mysql.connector.connect(
+                    host=host,
+                    port=int(port),
+                    user=user,
+                    password=password,
+                    database=database,
+                    autocommit=True,
+                    connection_timeout=60,
+                    ssl_disabled=True
+                )
+                st.success("🚂 Connected to Railway MySQL database")
+                return conn
+        
+        # Check for individual Railway environment variables
+        elif all(key in os.environ for key in ['MYSQL_HOST', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE']):
+            conn = mysql.connector.connect(
+                host=os.environ['MYSQL_HOST'],
+                user=os.environ['MYSQL_USER'],
+                password=os.environ['MYSQL_PASSWORD'],
+                database=os.environ['MYSQL_DATABASE'],
+                port=int(os.environ.get('MYSQL_PORT', 3306)),
+                autocommit=True,
+                connection_timeout=60,
+                ssl_disabled=True
+            )
+            st.success("🚂 Connected to Railway MySQL database")
+            return conn
+        
+        # Try to use Streamlit secrets (for Streamlit Cloud)
+        elif hasattr(st, 'secrets') and 'mysql' in st.secrets:
             conn = mysql.connector.connect(
                 host=st.secrets.mysql.host,
                 user=st.secrets.mysql.user,
@@ -45,6 +84,8 @@ def get_database_connection():
                 database=st.secrets.mysql.database,
                 autocommit=True
             )
+            st.success("☁️ Connected to Streamlit Cloud database")
+            return conn
         else:
             # Use local MySQL (for local development)
             conn = mysql.connector.connect(
@@ -54,7 +95,8 @@ def get_database_connection():
                 database='ECOM',
                 autocommit=True
             )
-        return conn
+            st.success("💻 Connected to local MySQL database")
+            return conn
     except mysql.connector.Error as err:
         st.error(f"Database connection failed: {err}")
         st.info("💡 **Tip**: Make sure your MySQL server is running and credentials are correct.")
