@@ -38,20 +38,39 @@ def get_database_connection():
     """Establish database connection with caching"""
     try:
         # Check for NeonDB/PostgreSQL DATABASE_URL (priority for cloud deployment)
-        if hasattr(st, 'secrets') and "DATABASE_URL" in st.secrets:
-            DATABASE_URL = st.secrets["DATABASE_URL"]
-            conn = psycopg2.connect(DATABASE_URL)
+        if "DATABASE_URL" in st.secrets:
+            DATABASE_URL=st.secrets["DATABASE_URL"]
+        # else 'DATABASE_URL' in os.environ:
+        #     database_url = os.environ['DATABASE_URL']
+            conn = psycopg2.connect(DATABASE_URL, sslmode='require')
             conn.autocommit = True
+            # st.success("🌐 Connected to NeonDB PostgreSQL database")
             return conn
         
-        # Try to use Streamlit secrets connections.neon (secondary)
+        # Check for individual PostgreSQL environment variables
+        elif all(key in os.environ for key in ['PGHOST', 'PGUSER', 'PGPASSWORD', 'PGDATABASE']):
+            conn = psycopg2.connect(
+                host=os.environ['PGHOST'],
+                user=os.environ['PGUSER'],
+                password=os.environ['PGPASSWORD'],
+                database=os.environ['PGDATABASE'],
+                port=os.environ.get('PGPORT', '5432'),
+                sslmode='require'
+            )
+            conn.autocommit = True
+            st.success("🌐 Connected to PostgreSQL database")
+            return conn
+        
+        # Try to use Streamlit secrets (for Streamlit Cloud)
         elif hasattr(st, 'secrets') and 'connections' in st.secrets and 'neon' in st.secrets.connections:
+            # Use NeonDB connection URL from secrets
             neon_url = st.secrets.connections.neon.url
             conn = psycopg2.connect(neon_url)
             conn.autocommit = True
+            # st.success("🌐 Connected to NeonDB via connection URL")
             return conn
         
-        # Try individual PostgreSQL secrets (tertiary)
+        # Try individual PostgreSQL secrets
         elif hasattr(st, 'secrets') and 'postgresql' in st.secrets:
             conn = psycopg2.connect(
                 host=st.secrets.postgresql.host,
@@ -59,18 +78,11 @@ def get_database_connection():
                 password=st.secrets.postgresql.password,
                 database=st.secrets.postgresql.database,
                 port=st.secrets.postgresql.get('port', '5432'),
-                sslmode=st.secrets.postgresql.get('sslmode', 'require')
+                sslmode='require'
             )
             conn.autocommit = True
+            st.success("☁️ Connected to Streamlit Cloud PostgreSQL database")
             return conn
-        
-        # Check for environment variables (for Railway/Heroku deployment)
-        elif "DATABASE_URL" in os.environ:
-            DATABASE_URL = os.environ['DATABASE_URL']
-            conn = psycopg2.connect(DATABASE_URL)
-            conn.autocommit = True
-            return conn
-        
         else:
             # Use local PostgreSQL (for local development)
             conn = psycopg2.connect(
