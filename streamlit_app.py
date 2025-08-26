@@ -1,12 +1,13 @@
 import streamlit as st
 import pandas as pd
 import seaborn as sns
-import mysql.connector
+import psycopg2
 import numpy as np
 from datetime import datetime
 import plotly.express as px
 import plotly.graph_objects as go
 import os
+from urllib.parse import urlparse
 
 # Set page config
 st.set_page_config(
@@ -36,69 +37,56 @@ st.markdown("""
 def get_database_connection():
     """Establish database connection with caching"""
     try:
-        # Check for Railway environment variables first
+        # Check for NeonDB/PostgreSQL DATABASE_URL (priority for cloud deployment)
         if 'DATABASE_URL' in os.environ:
-            # Parse Railway DATABASE_URL (format: mysql://user:password@host:port/database)
             database_url = os.environ['DATABASE_URL']
-            # Extract components from URL
-            import re
-            pattern = r'mysql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)'
-            match = re.match(pattern, database_url)
-            if match:
-                user, password, host, port, database = match.groups()
-                conn = mysql.connector.connect(
-                    host=host,
-                    port=int(port),
-                    user=user,
-                    password=password,
-                    database=database,
-                    autocommit=True,
-                    connection_timeout=60,
-                    ssl_disabled=True
-                )
-                st.success("🚂 Connected to Railway MySQL database")
-                return conn
+            conn = psycopg2.connect(database_url, sslmode='require')
+            conn.autocommit = True
+            st.success("🌐 Connected to NeonDB PostgreSQL database")
+            return conn
         
-        # Check for individual Railway environment variables
-        elif all(key in os.environ for key in ['MYSQL_HOST', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE']):
-            conn = mysql.connector.connect(
-                host=os.environ['MYSQL_HOST'],
-                user=os.environ['MYSQL_USER'],
-                password=os.environ['MYSQL_PASSWORD'],
-                database=os.environ['MYSQL_DATABASE'],
-                port=int(os.environ.get('MYSQL_PORT', 3306)),
-                autocommit=True,
-                connection_timeout=60,
-                ssl_disabled=True
+        # Check for individual PostgreSQL environment variables
+        elif all(key in os.environ for key in ['PGHOST', 'PGUSER', 'PGPASSWORD', 'PGDATABASE']):
+            conn = psycopg2.connect(
+                host=os.environ['PGHOST'],
+                user=os.environ['PGUSER'],
+                password=os.environ['PGPASSWORD'],
+                database=os.environ['PGDATABASE'],
+                port=os.environ.get('PGPORT', '5432'),
+                sslmode='require'
             )
-            st.success("🚂 Connected to Railway MySQL database")
+            conn.autocommit = True
+            st.success("🌐 Connected to PostgreSQL database")
             return conn
         
         # Try to use Streamlit secrets (for Streamlit Cloud)
-        elif hasattr(st, 'secrets') and 'mysql' in st.secrets:
-            conn = mysql.connector.connect(
-                host=st.secrets.mysql.host,
-                user=st.secrets.mysql.user,
-                password=st.secrets.mysql.password,
-                database=st.secrets.mysql.database,
-                autocommit=True
+        elif hasattr(st, 'secrets') and 'postgresql' in st.secrets:
+            conn = psycopg2.connect(
+                host=st.secrets.postgresql.host,
+                user=st.secrets.postgresql.user,
+                password=st.secrets.postgresql.password,
+                database=st.secrets.postgresql.database,
+                port=st.secrets.postgresql.get('port', '5432'),
+                sslmode='require'
             )
-            st.success(" Connected to Streamlit Cloud database")
+            conn.autocommit = True
+            st.success("☁️ Connected to Streamlit Cloud PostgreSQL database")
             return conn
         else:
-            # Use local MySQL (for local development)
-            conn = mysql.connector.connect(
+            # Use local PostgreSQL (for local development)
+            conn = psycopg2.connect(
                 host='localhost',
-                user='root',
+                user='postgres',
                 password='Punarbasu_03',
                 database='ECOM',
-                autocommit=True
+                port='5432'
             )
-            st.success("💻 Connected to local MySQL database")
+            conn.autocommit = True
+            st.success("💻 Connected to local PostgreSQL database")
             return conn
-    except mysql.connector.Error as err:
+    except psycopg2.Error as err:
         st.error(f"Database connection failed: {err}")
-        st.info("💡 **Tip**: Make sure your MySQL server is running and credentials are correct.")
+        st.info("💡 **Tip**: Make sure your PostgreSQL server is running and credentials are correct.")
         return None
     except Exception as e:
         st.error(f"Unexpected error: {e}")
@@ -117,7 +105,7 @@ def execute_query(query, connection):
         data = cursor.fetchall()
         cursor.close()
         return data
-    except mysql.connector.Error as err:
+    except psycopg2.Error as err:
         st.error(f"Query execution failed: {err}")
         return None
     except Exception as e:
@@ -134,7 +122,7 @@ def main():
     
     if db_connection is None:
         st.error("❌ Unable to connect to database. Please check your connection settings.")
-        st.info("📝 **Note**: This app requires a MySQL database connection. Make sure your database is running.")
+        st.info("📝 **Note**: This app requires a PostgreSQL database connection. Make sure your database is running.")
         if st.button("🔄 Try Reconnecting"):
             st.cache_resource.clear()
             st.rerun()
@@ -365,12 +353,12 @@ def main():
         # Monthly revenue trend (using distinct orders)
         query = """
         SELECT 
-            DATE_FORMAT(o.order_purchase_timestamp, '%Y-%m') as month,
+            TO_CHAR(o.order_purchase_timestamp, 'YYYY-MM') as month,
             ROUND(SUM(p.payment_value), 2) as monthly_revenue,
             COUNT(DISTINCT o.order_id) as order_count
         FROM (SELECT DISTINCT order_id, order_purchase_timestamp FROM orders) o
         JOIN payments p ON o.order_id = p.order_id
-        GROUP BY DATE_FORMAT(o.order_purchase_timestamp, '%Y-%m')
+        GROUP BY TO_CHAR(o.order_purchase_timestamp, 'YYYY-MM')
         ORDER BY month
         """
         result = execute_query(query, db_connection)
@@ -395,7 +383,7 @@ def main():
     # Footer
     st.markdown("---")
     st.markdown("### 📊 Dashboard created using Streamlit")
-    st.markdown("*Data source: E-commerce MySQL Database*")
+    st.markdown("*Data source: E-commerce PostgreSQL Database*")
     
     # Professional Links Section
     st.markdown("---")

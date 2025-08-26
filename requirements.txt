@@ -1,1 +1,6 @@
-streamlit==1.28.1
+streamlit
+pandas
+plotly
+psycopg2-binary
+numpy
+seaborn
