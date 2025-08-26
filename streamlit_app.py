@@ -38,9 +38,11 @@ def get_database_connection():
     """Establish database connection with caching"""
     try:
         # Check for NeonDB/PostgreSQL DATABASE_URL (priority for cloud deployment)
-        if 'DATABASE_URL' in os.environ:
-            database_url = os.environ['DATABASE_URL']
-            conn = psycopg2.connect(database_url, sslmode='require')
+        if "DATABASE_URL" in st.secrets:
+            DATABASE_URL=st.secrets["DATABASE_URL"]
+        # else 'DATABASE_URL' in os.environ:
+        #     database_url = os.environ['DATABASE_URL']
+            conn = psycopg2.connect(DATABASE_URL, sslmode='require')
             conn.autocommit = True
             st.success("🌐 Connected to NeonDB PostgreSQL database")
             return conn
@@ -60,6 +62,15 @@ def get_database_connection():
             return conn
         
         # Try to use Streamlit secrets (for Streamlit Cloud)
+        elif hasattr(st, 'secrets') and 'connections' in st.secrets and 'neon' in st.secrets.connections:
+            # Use NeonDB connection URL from secrets
+            neon_url = st.secrets.connections.neon.url
+            conn = psycopg2.connect(neon_url)
+            conn.autocommit = True
+            st.success("🌐 Connected to NeonDB via connection URL")
+            return conn
+        
+        # Try individual PostgreSQL secrets
         elif hasattr(st, 'secrets') and 'postgresql' in st.secrets:
             conn = psycopg2.connect(
                 host=st.secrets.postgresql.host,
@@ -172,7 +183,7 @@ def main():
         
         with col4:
             # Total revenue
-            query = "SELECT ROUND(SUM(payment_value), 2) as total_revenue FROM payments"
+            query = "SELECT ROUND(SUM(payment_value)::NUMERIC, 2) as total_revenue FROM payments"
             result = execute_query(query, db_connection)
             if result:
                 st.metric("Total Revenue", f"${result[0][0]:,.2f}")
@@ -194,7 +205,7 @@ def main():
         
         with col_b:
             # Average order value
-            query = "SELECT ROUND(AVG(payment_value), 2) FROM payments"
+            query = "SELECT ROUND(AVG(payment_value)::NUMERIC, 2) FROM payments"
             result = execute_query(query, db_connection)
             if result:
                 st.metric("Avg Order Value", f"${result[0][0]:,.2f}")
@@ -247,7 +258,7 @@ def main():
         with col2:
             # Orders per customer
             query = """
-            SELECT ROUND(COUNT(DISTINCT order_id) * 1.0 / COUNT(DISTINCT customer_id), 2)
+            SELECT ROUND((COUNT(DISTINCT order_id) * 1.0 / COUNT(DISTINCT customer_id))::NUMERIC, 2)
             FROM orders
             """
             result = execute_query(query, db_connection)
@@ -256,7 +267,7 @@ def main():
         
         with col3:
             # Average order value
-            query = "SELECT ROUND(AVG(payment_value), 2) FROM payments"
+            query = "SELECT ROUND(AVG(payment_value)::NUMERIC, 2) FROM payments"
             result = execute_query(query, db_connection)
             if result:
                 st.metric("Avg Order Value", f"${result[0][0]:,.2f}")
@@ -282,7 +293,7 @@ def main():
         with col_b:
             # Duplicate factor
             query = """
-            SELECT ROUND(COUNT(*) * 1.0 / COUNT(DISTINCT order_id), 1) as dup_factor 
+            SELECT ROUND((COUNT(*) * 1.0 / COUNT(DISTINCT order_id))::NUMERIC, 1) as dup_factor 
             FROM orders
             """
             result = execute_query(query, db_connection)
@@ -305,11 +316,11 @@ def main():
         st.subheader(" Orders Over Time")
         query = """
         SELECT 
-            DATE_FORMAT(order_purchase_timestamp, '%Y-%m') as month,
-            COUNT(DISTINCT order_id) as order_count
-        FROM orders
-        GROUP BY DATE_FORMAT(order_purchase_timestamp, '%Y-%m')
-        ORDER BY month
+  to_char(date_trunc('month', order_purchase_timestamp), 'YYYY-MM') AS month,
+  COUNT(DISTINCT order_id) AS order_count
+FROM orders
+GROUP BY 1
+ORDER BY 1;
         """
         result = execute_query(query, db_connection)
         
@@ -327,7 +338,7 @@ def main():
         query = """
         SELECT 
             p.product_category as category,
-            ROUND(SUM(pay.payment_value), 2) as total_revenue
+            ROUND(SUM(pay.payment_value)::NUMERIC, 2) as total_revenue
         FROM products p
         JOIN order_items oi ON p.product_id = oi.product_id
         JOIN payments pay ON oi.order_id = pay.order_id
@@ -354,7 +365,7 @@ def main():
         query = """
         SELECT 
             TO_CHAR(o.order_purchase_timestamp, 'YYYY-MM') as month,
-            ROUND(SUM(p.payment_value), 2) as monthly_revenue,
+            ROUND(SUM(p.payment_value)::NUMERIC, 2) as monthly_revenue,
             COUNT(DISTINCT o.order_id) as order_count
         FROM (SELECT DISTINCT order_id, order_purchase_timestamp FROM orders) o
         JOIN payments p ON o.order_id = p.order_id
