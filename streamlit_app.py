@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import os
 from urllib.parse import urlparse
 
-# Set page config
+# Set page config - PostgreSQL compatible version
 st.set_page_config(
     page_title="E-Commerce Analysis Dashboard",
     page_icon="📊",
