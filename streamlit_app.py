@@ -83,7 +83,7 @@ def get_database_connection():
                 database=st.secrets.mysql.database,
                 autocommit=True
             )
-            st.success("☁️ Connected to Streamlit Cloud database")
+            st.success(" Connected to Streamlit Cloud database")
             return conn
         else:
             # Use local MySQL (for local development)
@@ -143,19 +143,19 @@ def main():
     st.success("✅ Connected to database successfully!")
     
     # Sidebar navigation
-    st.sidebar.title("📋 Navigation")
+    st.sidebar.title(" Navigation")
     analysis_type = st.sidebar.selectbox(
         "Choose Analysis Type:",
         [
-            "📊 Overview",
-            "🏙️ Customer Analysis", 
-            "📦 Order Analysis",
-            "💰 Sales & Revenue",
-            "📈 Time Series Analysis",
+            " Overview",
+            " Customer Analysis", 
+            " Order Analysis",
+            " Sales & Revenue",
+            " Time Series Analysis",
         ]
     )
     
-    if analysis_type == "📊 Overview":
+    if analysis_type == " Overview":
         st.header("Dashboard Overview")
         
         # Key Metrics
@@ -192,7 +192,7 @@ def main():
         st.markdown("---")
         
         # Add data explanation
-        st.info("📊 **Data Note**: 'Unique Orders' shows distinct business transactions, while 'Order Records' shows total database rows (including duplicates).")
+        st.info(" **Data Note**: 'Unique Orders' shows distinct business transactions, while 'Order Records' shows total database rows (including duplicates).")
         
         # Additional insights
         col_a, col_b = st.columns(2)
@@ -211,7 +211,7 @@ def main():
             if result:
                 st.metric("Avg Order Value", f"${result[0][0]:,.2f}")
         
-        st.markdown("### 📋 About This Dashboard")
+        st.markdown("###  About This Dashboard")
         st.markdown("This dashboard analyzes e-commerce data including:")
         st.markdown("• **Customer Demographics**: Cities, states, and customer distribution")
         st.markdown("• **Order Patterns**: Monthly trends, seasonal analysis")
@@ -219,7 +219,7 @@ def main():
         st.markdown("• **Business Metrics**: Growth rates, retention, top performers")
         st.markdown("Navigate through different sections using the sidebar to explore various aspects of the data.")
     
-    elif analysis_type == "🏙️ Customer Analysis":
+    elif analysis_type == " Customer Analysis":
         st.header("Customer Analysis")
         
         # Customer distribution by state
@@ -241,7 +241,7 @@ def main():
             
             st.dataframe(df)
     
-    elif analysis_type == "📦 Order Analysis":
+    elif analysis_type == " Order Analysis":
         st.header("Order Analysis")
         
         # Order statistics
@@ -281,7 +281,7 @@ def main():
                 st.metric("Total Products", f"{result[0][0]:,}")
         
         # Data quality metrics
-        st.subheader("📊 Data Quality")
+        st.subheader(" Data Quality")
         col_a, col_b = st.columns(2)
         
         with col_a:
@@ -301,10 +301,10 @@ def main():
             if result:
                 st.metric("Duplicate Factor", f"{result[0][0]}x")
         
-        st.info("💡 **Note**: Each order appears multiple times in the database. This could be due to order updates, multiple items, or data import issues.")
+        st.info(" **Note**: Each order appears multiple times in the database. This could be due to order updates, multiple items, or data import issues.")
         
         # Orders by status
-        st.subheader("📈 Orders by Status")
+        st.subheader(" Orders by Status")
         query = "SELECT order_status, COUNT(DISTINCT order_id) as count FROM orders GROUP BY order_status ORDER BY count DESC"
         result = execute_query(query, db_connection)
         if result:
@@ -314,7 +314,7 @@ def main():
             st.plotly_chart(fig, use_container_width=True)
         
         # Orders by month (using distinct orders to avoid duplicates)
-        st.subheader("📅 Orders Over Time")
+        st.subheader(" Orders Over Time")
         query = """
         SELECT 
             DATE_FORMAT(order_purchase_timestamp, '%Y-%m') as month,
@@ -332,7 +332,7 @@ def main():
                          title="Unique Orders Over Time")
             st.plotly_chart(fig, use_container_width=True)
     
-    elif analysis_type == "💰 Sales & Revenue":
+    elif analysis_type == " Sales & Revenue":
         st.header("Sales & Revenue Analysis")
         
         # Revenue by product category
@@ -359,7 +359,7 @@ def main():
             
             st.dataframe(df)
     
-    elif analysis_type == "📈 Time Series Analysis":
+    elif analysis_type == " Time Series Analysis":
         st.header("Time Series Analysis")
         
         # Monthly revenue trend (using distinct orders)
@@ -413,7 +413,7 @@ def main():
     
     with col3:
         st.markdown("📧 **Email**")
-        st.markdown("[Contact me](mailto:your.email@example.com)")
+        st.markdown("[Contact me](mailto:punarbasu02chakra@gmail.com)")
     
     st.markdown("---")
     st.markdown("*Built with ❤️ using Python, SQL & Streamlit*")
