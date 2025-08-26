@@ -229,6 +229,7 @@ def main():
         ORDER BY customer_count DESC
         LIMIT 10
         """
+        st.write("Executing this query:", query)
         result = execute_query(query, db_connection)
         
         if result:
@@ -322,6 +323,7 @@ def main():
         GROUP BY TO_CHAR(order_purchase_timestamp::TIMESTAMP, 'YYYY-MM')
         ORDER BY month
         """
+        st.write("Executing this query:", query)
         result = execute_query(query, db_connection)
         
         if result:
@@ -346,6 +348,7 @@ def main():
         ORDER BY total_revenue DESC
         LIMIT 10
         """
+        st.write("Executing this query:", query)
         result = execute_query(query, db_connection)
         
         if result:
@@ -372,6 +375,7 @@ def main():
         GROUP BY TO_CHAR(o.order_purchase_timestamp::TIMESTAMP, 'YYYY-MM')
         ORDER BY month
         """
+        st.write("Executing this query:", query)
         result = execute_query(query, db_connection)
         
         if result:
