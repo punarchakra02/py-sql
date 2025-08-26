@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 
 # Set page config
 st.set_page_config(
-    page_title="E-Commerce Data Analysis Dashboard",
+    page_title="E-Commerce Analysis Dashboard",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -44,7 +44,7 @@ def get_database_connection():
         #     database_url = os.environ['DATABASE_URL']
             conn = psycopg2.connect(DATABASE_URL, sslmode='require')
             conn.autocommit = True
-            st.success("🌐 Connected to NeonDB PostgreSQL database")
+            # st.success("🌐 Connected to NeonDB PostgreSQL database")
             return conn
         
         # Check for individual PostgreSQL environment variables
@@ -67,7 +67,7 @@ def get_database_connection():
             neon_url = st.secrets.connections.neon.url
             conn = psycopg2.connect(neon_url)
             conn.autocommit = True
-            st.success("🌐 Connected to NeonDB via connection URL")
+            # st.success("🌐 Connected to NeonDB via connection URL")
             return conn
         
         # Try individual PostgreSQL secrets
@@ -97,7 +97,7 @@ def get_database_connection():
             return conn
     except psycopg2.Error as err:
         st.error(f"Database connection failed: {err}")
-        st.info("💡 **Tip**: Make sure your PostgreSQL server is running and credentials are correct.")
+        st.info("**Tip**: Make sure your PostgreSQL server is running and credentials are correct.")
         return None
     except Exception as e:
         st.error(f"Unexpected error: {e}")
@@ -162,7 +162,7 @@ def main():
         
         with col1:
             # Total customers
-            query = "SELECT COUNT(DISTINCT customer_id) as total_customers FROM customers"
+            query = "SELECT COUNT(customer_id) as total_customers FROM customers"
             result = execute_query(query, db_connection)
             if result:
                 st.metric("Total Customers", f"{result[0][0]:,}")
@@ -313,14 +313,14 @@ def main():
             st.plotly_chart(fig, use_container_width=True)
         
         # Orders by month (using distinct orders to avoid duplicates)
-        st.subheader(" Orders Over Time")
+        st.subheader("📅 Orders Over Time")
         query = """
         SELECT 
-  to_char(date_trunc('month', order_purchase_timestamp), 'YYYY-MM') AS month,
-  COUNT(DISTINCT order_id) AS order_count
-FROM orders
-GROUP BY 1
-ORDER BY 1;
+            TO_CHAR(order_purchase_timestamp::TIMESTAMP, 'YYYY-MM') as month,
+            COUNT(DISTINCT order_id) as order_count
+        FROM orders
+        GROUP BY TO_CHAR(order_purchase_timestamp::TIMESTAMP, 'YYYY-MM')
+        ORDER BY month
         """
         result = execute_query(query, db_connection)
         
@@ -337,12 +337,12 @@ ORDER BY 1;
         # Revenue by product category
         query = """
         SELECT 
-            p.product_category as category,
+            p."product category" as category,
             ROUND(SUM(pay.payment_value)::NUMERIC, 2) as total_revenue
         FROM products p
         JOIN order_items oi ON p.product_id = oi.product_id
         JOIN payments pay ON oi.order_id = pay.order_id
-        GROUP BY p.product_category
+        GROUP BY p."product category"
         ORDER BY total_revenue DESC
         LIMIT 10
         """
@@ -364,12 +364,12 @@ ORDER BY 1;
         # Monthly revenue trend (using distinct orders)
         query = """
         SELECT 
-            TO_CHAR(o.order_purchase_timestamp, 'YYYY-MM') as month,
+            TO_CHAR(o.order_purchase_timestamp::TIMESTAMP, 'YYYY-MM') as month,
             ROUND(SUM(p.payment_value)::NUMERIC, 2) as monthly_revenue,
             COUNT(DISTINCT o.order_id) as order_count
         FROM (SELECT DISTINCT order_id, order_purchase_timestamp FROM orders) o
         JOIN payments p ON o.order_id = p.order_id
-        GROUP BY TO_CHAR(o.order_purchase_timestamp, 'YYYY-MM')
+        GROUP BY TO_CHAR(o.order_purchase_timestamp::TIMESTAMP, 'YYYY-MM')
         ORDER BY month
         """
         result = execute_query(query, db_connection)
